@@ -9,74 +9,6 @@ using System.Numerics;
 public class PreciseNumberTests
 {
 	[TestMethod]
-	public void TestPreciseAdd()
-	{
-		var left = new PreciseNumber(2, new BigInteger(100)); // 1.00 x 10^2
-		var right = new PreciseNumber(2, new BigInteger(50)); // 0.50 x 10^2
-		var result = PreciseNumber.PreciseAdd(left, right);
-		var expected = new PreciseNumber(2, new BigInteger(150)); // 1.50 x 10^2
-		Assert.AreEqual(expected, result);
-	}
-
-	[TestMethod]
-	public void TestPreciseSubtract()
-	{
-		var left = new PreciseNumber(2, new BigInteger(100)); // 1.00 x 10^2
-		var right = new PreciseNumber(2, new BigInteger(50)); // 0.50 x 10^2
-		var result = PreciseNumber.PreciseSubtract(left, right);
-		var expected = new PreciseNumber(2, new BigInteger(50)); // 0.50 x 10^2
-		Assert.AreEqual(expected, result);
-	}
-
-	[TestMethod]
-	public void TestPreciseMultiply()
-	{
-		var left = new PreciseNumber(2, new BigInteger(2)); // 2.00 x 10^2
-		var right = new PreciseNumber(1, new BigInteger(3)); // 3.00 x 10^1
-		var result = PreciseNumber.PreciseMultiply(left, right);
-		var expected = new PreciseNumber(3, new BigInteger(6)); // 6.00 x 10^3
-		Assert.AreEqual(expected, result);
-	}
-
-	[TestMethod]
-	public void TestPreciseDivide()
-	{
-		var left = new PreciseNumber(2, new BigInteger(200)); // 2.00 x 10^2
-		var right = new PreciseNumber(1, new BigInteger(5)); // 5.00 x 10^1
-		var result = PreciseNumber.PreciseDivide(left, right);
-		var expected = new PreciseNumber(1, new BigInteger(40)); // 4.00 x 10^1
-		Assert.AreEqual(expected, result);
-	}
-
-	[TestMethod]
-	public void TestPreciseNumberPow()
-	{
-		var baseNumber = new PreciseNumber(0, new BigInteger(2)); // 2
-		var power = new PreciseNumber(0, new BigInteger(3)); // 3
-		var result = baseNumber.Pow(power);
-		var expected = new PreciseNumber(0, new BigInteger(8)); // 2^3 = 8
-		Assert.AreEqual(expected, result);
-	}
-
-	[TestMethod]
-	public void TestPreciseNumberExp()
-	{
-		var power = new PreciseNumber(0, new BigInteger(1)); // 1
-		var result = PreciseNumber.Exp(power);
-		var expected = PreciseNumber.E; // e^1 = e
-		Assert.AreEqual(expected, result);
-	}
-
-	[TestMethod]
-	public void TestPreciseNumberExpNegativePower()
-	{
-		var power = new PreciseNumber(0, new BigInteger(-1)); // -1
-		var result = PreciseNumber.Exp(power);
-		var expected = PreciseNumber.One / PreciseNumber.E; // e^-1 = 1/e
-		Assert.AreEqual(expected, result);
-	}
-
-	[TestMethod]
 	public void TestZeroCheck()
 	{
 		var zero = new PreciseNumber(0, BigInteger.Zero);
@@ -204,41 +136,41 @@ public class PreciseNumberTests
 	}
 
 	[TestMethod]
-	public void TestPreciseAddWithCommonizedExponent()
+	public void TestAddWithCommonizedExponent()
 	{
 		var left = 1000.ToPreciseNumber();
 		var right = 5.ToPreciseNumber();
-		var result = PreciseNumber.PreciseAdd(left, right);
+		var result = PreciseNumber.Add(left, right);
 		var expected = 1005.ToPreciseNumber();
 		Assert.AreEqual(expected, result);
 	}
 
 	[TestMethod]
-	public void TestPreciseSubtractWithCommonizedExponent()
+	public void TestSubtractWithCommonizedExponent()
 	{
 		var left = 1000.ToPreciseNumber();
 		var right = 5.ToPreciseNumber();
-		var result = PreciseNumber.PreciseSubtract(left, right);
+		var result = PreciseNumber.Subtract(left, right);
 		var expected = 995.ToPreciseNumber();
 		Assert.AreEqual(expected, result);
 	}
 
 	[TestMethod]
-	public void TestPreciseMultiplyWithCommonizedExponent()
+	public void TestMultiplyWithCommonizedExponent()
 	{
 		var left = 2000.ToPreciseNumber();
 		var right = 30.ToPreciseNumber();
-		var result = PreciseNumber.PreciseMultiply(left, right);
+		var result = PreciseNumber.Multiply(left, right);
 		var expected = 60000.ToPreciseNumber();
 		Assert.AreEqual(expected, result);
 	}
 
 	[TestMethod]
-	public void TestPreciseDivideWithCommonizedExponent()
+	public void TestDivideWithCommonizedExponent()
 	{
 		var left = 20000.ToPreciseNumber();
 		var right = 40.ToPreciseNumber();
-		var result = PreciseNumber.PreciseDivide(left, right);
+		var result = PreciseNumber.Divide(left, right);
 		var expected = 500.ToPreciseNumber();
 		Assert.AreEqual(expected, result);
 	}
@@ -361,6 +293,7 @@ public class PreciseNumberTests
 		Assert.IsTrue(one.CompareTo(zero) > 0);
 		Assert.IsTrue(zero.CompareTo(one) < 0);
 		Assert.IsTrue(one.CompareTo(PreciseNumber.One) == 0);
+		Assert.IsTrue(one.CompareTo(null) > 0);
 	}
 
 	// Tests for comparison operators
@@ -422,26 +355,35 @@ public class PreciseNumberTests
 		Assert.IsFalse(one != anotherOne);
 	}
 
-	// Tests for unsupported operators
 	[TestMethod]
 	public void Test_Modulus()
 	{
-		var one = PreciseNumber.One;
-		Assert.ThrowsException<NotSupportedException>(() => one % one);
+		Assert.AreEqual(PreciseNumber.Zero, PreciseNumber.One % PreciseNumber.One);
+		Assert.AreEqual(PreciseNumber.Zero, 5.ToPreciseNumber() % 5.ToPreciseNumber());
+		Assert.AreEqual(PreciseNumber.Zero, 6.ToPreciseNumber() % 2.ToPreciseNumber());
+		Assert.AreEqual(PreciseNumber.One, 7.ToPreciseNumber() % 2.ToPreciseNumber());
 	}
 
 	[TestMethod]
 	public void Test_Decrement()
 	{
-		var one = PreciseNumber.One;
-		Assert.ThrowsException<NotSupportedException>(() => --one);
+		var accumulator = 6.ToPreciseNumber();
+		for (int i = 0; i < 3; ++i)
+		{
+			--accumulator;
+		}
+		Assert.AreEqual(3.ToPreciseNumber(), accumulator);
 	}
 
 	[TestMethod]
 	public void Test_Increment()
 	{
-		var one = PreciseNumber.One;
-		Assert.ThrowsException<NotSupportedException>(() => ++one);
+		var accumulator = PreciseNumber.Zero;
+		for (int i = 0; i < 3; ++i)
+		{
+			++accumulator;
+		}
+		Assert.AreEqual(3.ToPreciseNumber(), accumulator);
 	}
 
 	// Test for unary + operator
@@ -451,137 +393,6 @@ public class PreciseNumberTests
 		var one = PreciseNumber.One;
 		var result = +one;
 		Assert.AreEqual(PreciseNumber.One, result);
-	}
-
-	// Tests for static methods of unary operators
-	[TestMethod]
-	public void Test_StaticUnaryPlus()
-	{
-		var one = PreciseNumber.One;
-		var result = PreciseNumber.Plus(one);
-		Assert.AreEqual(PreciseNumber.One, result);
-	}
-
-	[TestMethod]
-	public void Test_StaticUnaryNegate()
-	{
-		var one = PreciseNumber.One;
-		var result = PreciseNumber.Negate(one);
-		Assert.AreEqual(PreciseNumber.NegativeOne, result);
-	}
-
-	// Tests for static methods of binary operators
-	[TestMethod]
-	public void Test_StaticAdd()
-	{
-		var one = PreciseNumber.One;
-		var result = PreciseNumber.Add(one, one);
-		Assert.AreEqual(2.ToPreciseNumber(), result);
-	}
-
-	[TestMethod]
-	public void Test_StaticSubtract()
-	{
-		var one = PreciseNumber.One;
-		var result = PreciseNumber.Subtract(one, one);
-		Assert.AreEqual(PreciseNumber.Zero, result);
-	}
-
-	[TestMethod]
-	public void Test_StaticMultiply()
-	{
-		var one = PreciseNumber.One;
-		var result = PreciseNumber.Multiply(one, one);
-		Assert.AreEqual(PreciseNumber.One, result);
-	}
-
-	[TestMethod]
-	public void Test_StaticDivide()
-	{
-		var one = PreciseNumber.One;
-		var result = PreciseNumber.Divide(one, one);
-		Assert.AreEqual(PreciseNumber.One, result);
-	}
-
-	[TestMethod]
-	public void Test_StaticModulus()
-	{
-		var one = PreciseNumber.One;
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.Mod(one, one));
-	}
-
-	// Test for static increment method
-	[TestMethod]
-	public void Test_StaticIncrement()
-	{
-		var one = PreciseNumber.One;
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.Increment(one));
-	}
-
-	// Test for static decrement method
-	[TestMethod]
-	public void Test_StaticDecrement()
-	{
-		var one = PreciseNumber.One;
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.Decrement(one));
-	}
-
-	[TestMethod]
-	public void Test_StaticGreaterThan()
-	{
-		var one = PreciseNumber.One;
-		var zero = PreciseNumber.Zero;
-		Assert.IsTrue(PreciseNumber.GreaterThan(one, zero));
-		Assert.IsFalse(PreciseNumber.GreaterThan(zero, one));
-	}
-
-	[TestMethod]
-	public void Test_StaticGreaterThanOrEqual()
-	{
-		var one = PreciseNumber.One;
-		var zero = PreciseNumber.Zero;
-		Assert.IsTrue(PreciseNumber.GreaterThanOrEqual(one, zero));
-		Assert.IsTrue(PreciseNumber.GreaterThanOrEqual(one, PreciseNumber.One));
-		Assert.IsFalse(PreciseNumber.GreaterThanOrEqual(zero, one));
-	}
-
-	[TestMethod]
-	public void Test_StaticLessThan()
-	{
-		var one = PreciseNumber.One;
-		var zero = PreciseNumber.Zero;
-		Assert.IsTrue(PreciseNumber.LessThan(zero, one));
-		Assert.IsFalse(PreciseNumber.LessThan(one, zero));
-	}
-
-	[TestMethod]
-	public void Test_StaticLessThanOrEqual()
-	{
-		var one = PreciseNumber.One;
-		var zero = PreciseNumber.Zero;
-		Assert.IsTrue(PreciseNumber.LessThanOrEqual(zero, one));
-		Assert.IsTrue(PreciseNumber.LessThanOrEqual(one, PreciseNumber.One));
-		Assert.IsFalse(PreciseNumber.LessThanOrEqual(one, zero));
-	}
-
-	[TestMethod]
-	public void Test_StaticEqual()
-	{
-		var one = PreciseNumber.One;
-		var anotherOne = 1.ToPreciseNumber();
-		var zero = PreciseNumber.Zero;
-		Assert.IsTrue(PreciseNumber.Equal(one, anotherOne));
-		Assert.IsFalse(PreciseNumber.Equal(one, zero));
-	}
-
-	[TestMethod]
-	public void Test_StaticNotEqual()
-	{
-		var one = PreciseNumber.One;
-		var anotherOne = 1.ToPreciseNumber();
-		var zero = PreciseNumber.Zero;
-		Assert.IsTrue(PreciseNumber.NotEqual(one, zero));
-		Assert.IsFalse(PreciseNumber.NotEqual(one, anotherOne));
 	}
 
 	// Test for static Max method
@@ -805,58 +616,6 @@ public class PreciseNumberTests
 
 		var one = PreciseNumber.One;
 		Assert.IsFalse(PreciseNumber.IsZero(one));
-	}
-
-	[TestMethod]
-	public void Test_TryParse_ReadOnlySpan()
-	{
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.TryParse("1.23e2".AsSpan(), NumberStyles.Float, CultureInfo.InvariantCulture, out var result));
-	}
-
-	[TestMethod]
-	public void Test_TryParse_String_Style_Provider()
-	{
-		string input = "1.23e2";
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out var result));
-	}
-
-	[TestMethod]
-	public void Test_TryParse_String_Provider()
-	{
-		string input = "1.23e2";
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.TryParse(input, CultureInfo.InvariantCulture, out var result));
-	}
-
-	[TestMethod]
-	public void Test_TryParse_ReadOnlySpan_Provider()
-	{
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.TryParse("1.23e2".AsSpan(), CultureInfo.InvariantCulture, out var result));
-	}
-
-	[TestMethod]
-	public void Test_Parse_ReadOnlySpan_Style_Provider()
-	{
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.Parse("1.23e2".AsSpan(), NumberStyles.Float, CultureInfo.InvariantCulture));
-	}
-
-	[TestMethod]
-	public void Test_Parse_String_Style_Provider()
-	{
-		string input = "1.23e2";
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.Parse(input, NumberStyles.Float, CultureInfo.InvariantCulture));
-	}
-
-	[TestMethod]
-	public void Test_Parse_String_Provider()
-	{
-		string input = "1.23e2";
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.Parse(input, CultureInfo.InvariantCulture));
-	}
-
-	[TestMethod]
-	public void Test_Parse_ReadOnlySpan_Provider()
-	{
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.Parse("1.23e2".AsSpan(), CultureInfo.InvariantCulture));
 	}
 
 	[TestMethod]
@@ -1131,14 +890,6 @@ public class PreciseNumberTests
 	}
 
 	[TestMethod]
-	public void Test_Parse_WithDifferentCulture()
-	{
-		string str = "123,45";
-		var culture = CultureInfo.GetCultureInfo("fr-FR");
-		Assert.ThrowsException<NotSupportedException>(() => PreciseNumber.Parse(str.AsSpan(), culture));
-	}
-
-	[TestMethod]
 	public void Test_Addition_WithLargeNumbers()
 	{
 		var largeNum1 = PreciseNumber.CreateFromInteger(BigInteger.Parse("79228162514264337593543950335"));
@@ -1259,10 +1010,10 @@ public class PreciseNumberTests
 	{
 		var number1 = new PreciseNumber(1, 123);
 		var number2 = new PreciseNumber(3, 456);
-		int result = PreciseNumber.MakeCommonizedAndGetExponent(ref number1, ref number2);
+		var (common1, common2, result) = PreciseNumber.MakeCommonizedWithExponent(number1, number2);
 		Assert.AreEqual(1, result);
-		Assert.AreEqual(123, number1.Significand);
-		Assert.AreEqual(45600, number2.Significand);
+		Assert.AreEqual(123, common1.Significand);
+		Assert.AreEqual(45600, common2.Significand);
 	}
 
 	[TestMethod]
@@ -1376,6 +1127,14 @@ public class PreciseNumberTests
 		var number1 = new PreciseNumber(0, 12345);
 		var number2 = new PreciseNumber(0, 678);
 		Assert.IsTrue(number1 != number2);
+	}
+
+	[TestMethod]
+	public void Test_StaticNotEqual()
+	{
+		var number1 = new PreciseNumber(0, 12345);
+		var number2 = new PreciseNumber(0, 678);
+		Assert.IsTrue(PreciseNumber.NotEqual(number1, number2));
 	}
 
 	[TestMethod]
@@ -1939,7 +1698,15 @@ public class PreciseNumberTests
 	{
 		var number = 1234.5.ToPreciseNumber();
 		Assert.ThrowsException<DivideByZeroException>(() => number / PreciseNumber.Zero);
-		Assert.ThrowsException<DivideByZeroException>(() => PreciseNumber.PreciseDivide(number, PreciseNumber.Zero));
+		Assert.ThrowsException<DivideByZeroException>(() => PreciseNumber.Divide(number, PreciseNumber.Zero));
+	}
+
+	[TestMethod]
+	public void TestModZero()
+	{
+		var number = 1234.5.ToPreciseNumber();
+		Assert.ThrowsException<DivideByZeroException>(() => number % PreciseNumber.Zero);
+		Assert.ThrowsException<DivideByZeroException>(() => PreciseNumber.Mod(number, PreciseNumber.Zero));
 	}
 
 	[TestMethod]
@@ -1948,7 +1715,7 @@ public class PreciseNumberTests
 		var number = 1234.5.ToPreciseNumber();
 		var result = number / number;
 		Assert.AreEqual(PreciseNumber.One, result);
-		Assert.AreEqual(PreciseNumber.One, PreciseNumber.PreciseDivide(number, number));
+		Assert.AreEqual(PreciseNumber.One, PreciseNumber.Divide(number, number));
 	}
 
 	[TestMethod]
@@ -1960,9 +1727,140 @@ public class PreciseNumberTests
 		Assert.AreEqual(PreciseNumber.Zero, PreciseNumber.Zero * PreciseNumber.One);
 		Assert.AreEqual(PreciseNumber.Zero, PreciseNumber.One * PreciseNumber.Zero);
 
-		Assert.AreEqual(two, PreciseNumber.PreciseMultiply(PreciseNumber.One, two));
-		Assert.AreEqual(two, PreciseNumber.PreciseMultiply(two, PreciseNumber.One));
-		Assert.AreEqual(PreciseNumber.Zero, PreciseNumber.PreciseMultiply(PreciseNumber.Zero, PreciseNumber.One));
-		Assert.AreEqual(PreciseNumber.Zero, PreciseNumber.PreciseMultiply(PreciseNumber.One, PreciseNumber.Zero));
+		Assert.AreEqual(two, PreciseNumber.Multiply(PreciseNumber.One, two));
+		Assert.AreEqual(two, PreciseNumber.Multiply(two, PreciseNumber.One));
+		Assert.AreEqual(PreciseNumber.Zero, PreciseNumber.Multiply(PreciseNumber.Zero, PreciseNumber.One));
+		Assert.AreEqual(PreciseNumber.Zero, PreciseNumber.Multiply(PreciseNumber.One, PreciseNumber.Zero));
+	}
+
+	[TestMethod]
+	public void TestParseWithValidInput()
+	{
+		var input = "1.23E4".AsSpan();
+		var expected = 1.23e4.ToPreciseNumber();
+		var result = PreciseNumber.Parse(input, NumberStyles.Any, null);
+		Assert.AreEqual(expected, result);
+
+		result = PreciseNumber.Parse(input, null);
+		Assert.AreEqual(expected, result);
+	}
+
+	[TestMethod]
+	public void TestParseWithZero()
+	{
+		var input = "0".AsSpan();
+		var result = PreciseNumber.Parse(input, NumberStyles.Any, null);
+		Assert.AreEqual(PreciseNumber.Zero, result);
+	}
+
+	[TestMethod]
+	public void TestParseWithNegativeInput()
+	{
+		var input = "-5.67E-2".AsSpan();
+		var expected = -5.67e-2.ToPreciseNumber();
+		var result = PreciseNumber.Parse(input, NumberStyles.Any, null);
+		Assert.AreEqual(expected, result);
+	}
+
+	[TestMethod]
+	public void TestParseWithInvalidInput()
+	{
+		Assert.ThrowsException<FormatException>(() => PreciseNumber.Parse("1.2.3E4".AsSpan(), NumberStyles.Any, null));
+		Assert.ThrowsException<FormatException>(() => PreciseNumber.Parse("invalid".AsSpan(), NumberStyles.Any, null));
+		Assert.ThrowsException<FormatException>(() => PreciseNumber.Parse(string.Empty.AsSpan(), NumberStyles.Any, null));
+	}
+
+	[TestMethod]
+	public void TestParseStringWithValidInput()
+	{
+		string input = "1.23E4";
+		var expected = 1.23e4.ToPreciseNumber();
+		var result = PreciseNumber.Parse(input, NumberStyles.Any, null);
+		Assert.AreEqual(expected, result);
+
+		result = PreciseNumber.Parse(input, null);
+		Assert.AreEqual(expected, result);
+	}
+
+	[TestMethod]
+	public void TestParseStringWithNegativeInput()
+	{
+		string input = "-5.67E-2";
+		var expected = -5.67e-2.ToPreciseNumber();
+		var result = PreciseNumber.Parse(input, NumberStyles.Any, null);
+		Assert.AreEqual(expected, result);
+	}
+
+	[TestMethod]
+	public void TestParseStringWithInvalidInput()
+	{
+		string input = "invalid";
+		Assert.ThrowsException<FormatException>(() => PreciseNumber.Parse(input, NumberStyles.Any, null));
+	}
+
+	[TestMethod]
+	public void TestTryParseWithValidInput()
+	{
+		var input = "1.23E4".AsSpan();
+		var expected = 1.23e4.ToPreciseNumber();
+		bool success = PreciseNumber.TryParse(input, NumberStyles.Any, null, out var result);
+		Assert.IsTrue(success);
+		Assert.AreEqual(expected, result);
+
+		success = PreciseNumber.TryParse(input, provider: null, out result);
+		Assert.IsTrue(success);
+		Assert.AreEqual(expected, result);
+	}
+
+	[TestMethod]
+	public void TestTryParseWithNegativeInput()
+	{
+		var input = "-5.67E-2".AsSpan();
+		var expected = -5.67e-2.ToPreciseNumber();
+		bool success = PreciseNumber.TryParse(input, NumberStyles.Any, null, out var result);
+		Assert.IsTrue(success);
+		Assert.AreEqual(expected, result);
+	}
+
+	[TestMethod]
+	public void TestTryParseWithInvalidInput()
+	{
+		var input = "invalid".AsSpan();
+		bool success = PreciseNumber.TryParse(input, NumberStyles.Any, null, out var result);
+		Assert.IsFalse(success);
+		Assert.AreEqual(default, result);
+	}
+
+	[TestMethod]
+	public void TestTryParseStringWithValidInput()
+	{
+		string input = "1.23E4";
+		var expected = 1.23e4.ToPreciseNumber();
+		bool success = PreciseNumber.TryParse(input, NumberStyles.Any, null, out var result);
+		Assert.IsTrue(success);
+		Assert.AreEqual(expected, result);
+
+		success = PreciseNumber.TryParse(input, null, out result);
+		Assert.IsTrue(success);
+		Assert.AreEqual(expected, result);
+	}
+
+	[TestMethod]
+	public void TestTryParseStringWithNegativeInput()
+	{
+		string input = "-5.67E-2";
+		var expected = -5.67e-2.ToPreciseNumber();
+		bool success = PreciseNumber.TryParse(input, NumberStyles.Any, null, out var result);
+		Assert.IsTrue(success);
+		Assert.AreEqual(expected, result);
+	}
+
+	[TestMethod]
+	public void TestTryParseStringWithInvalidInput()
+	{
+		string input = "invalid";
+		bool success = PreciseNumber.TryParse(input, NumberStyles.Any, null, out var result);
+		Assert.IsFalse(success);
+		Assert.AreEqual(default, result);
 	}
 }

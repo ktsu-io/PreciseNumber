@@ -10,12 +10,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Numerics;
 
-
 /// <summary>
 /// Represents a precise number.
 /// </summary>
 [DebuggerDisplay("{Significand}e{Exponent}")]
-public readonly struct PreciseNumber
+public record PreciseNumber
 	: INumber<PreciseNumber>
 {
 	private const int Base10 = 10;
@@ -121,14 +120,8 @@ public readonly struct PreciseNumber
 	public static PreciseNumber MultiplicativeIdentity => One;
 
 	/// <inheritdoc/>
-	public override bool Equals(object? obj) => obj is PreciseNumber number && this == number;
-
-	/// <summary>
-	/// Determines whether the specified object is equal to the current object.
-	/// </summary>
-	/// <param name="other">The object to compare with the current object.</param>
-	/// <returns><c>true</c> if the specified object is equal to the current object; otherwise, <c>false</c>.</returns>
-	public bool Equals(PreciseNumber other) => this == other;
+	public virtual bool Equals(PreciseNumber? other) =>
+		other is not null && Equal(this, other);
 
 	/// <inheritdoc/>
 	public override int GetHashCode() => HashCode.Combine(Exponent, Significand);
@@ -444,20 +437,26 @@ public readonly struct PreciseNumber
 	}
 
 	/// <summary>
-	/// Makes two numbers have a common exponent.
+	/// Adjusts the exponents of two <see cref="PreciseNumber"/> instances to a common exponent.
 	/// </summary>
-	/// <param name="left">The first number.</param>
-	/// <param name="right">The second number.</param>
-	internal static void MakeCommonized(ref PreciseNumber left, ref PreciseNumber right) =>
-		_ = MakeCommonizedAndGetExponent(ref left, ref right);
+	/// <param name="left">The left <see cref="PreciseNumber"/> instance.</param>
+	/// <param name="right">The right <see cref="PreciseNumber"/> instance.</param>
+	/// <returns>A tuple containing the commonized <see cref="PreciseNumber"/> instances.</returns>
+	internal static (PreciseNumber, PreciseNumber) MakeCommonized(PreciseNumber left, PreciseNumber right)
+	{
+		var (commonLeft, commonRight, _) = MakeCommonizedWithExponent(left, right);
+		return (commonLeft, commonRight);
+	}
 
 	/// <summary>
-	/// Makes two numbers have a common exponent and returns the common exponent.
+	/// Adjusts the exponents of two <see cref="PreciseNumber"/> instances to a common exponent and returns the common exponent.
 	/// </summary>
-	/// <param name="left">The first number.</param>
-	/// <param name="right">The second number.</param>
-	/// <returns>The common exponent.</returns>
-	internal static int MakeCommonizedAndGetExponent(ref PreciseNumber left, ref PreciseNumber right)
+	/// <param name="left">The left <see cref="PreciseNumber"/> instance.</param>
+	/// <param name="right">The right <see cref="PreciseNumber"/> instance.</param>
+	/// <returns>
+	/// A tuple containing the commonized <see cref="PreciseNumber"/> instances and the common exponent.
+	/// </returns>
+	internal static (PreciseNumber, PreciseNumber, int) MakeCommonizedWithExponent(PreciseNumber left, PreciseNumber right)
 	{
 		int smallestExponent = left.Exponent < right.Exponent ? left.Exponent : right.Exponent;
 		int exponentDifferenceLeft = Math.Abs(left.Exponent - smallestExponent);
@@ -465,10 +464,21 @@ public readonly struct PreciseNumber
 		var newSignificandLeft = left.Significand * BigInteger.Pow(Base10, exponentDifferenceLeft);
 		var newSignificandRight = right.Significand * BigInteger.Pow(Base10, exponentDifferenceRight);
 
-		left = new(smallestExponent, newSignificandLeft, sanitize: false);
-		right = new(smallestExponent, newSignificandRight, sanitize: false);
+		return (new(smallestExponent, newSignificandLeft, sanitize: false),
+			new(smallestExponent, newSignificandRight, sanitize: false),
+			smallestExponent);
+	}
 
-		return smallestExponent;
+	/// <inheritdoc/>
+	public int CompareTo(PreciseNumber? other)
+	{
+		if (other is null)
+		{
+			return 1;
+		}
+
+		int greaterOrEqual = this > other ? 1 : 0;
+		return this < other ? -1 : greaterOrEqual;
 	}
 
 	/// <inheritdoc/>
@@ -477,17 +487,6 @@ public readonly struct PreciseNumber
 		return obj is PreciseNumber preciseNumber
 			? CompareTo(preciseNumber)
 			: throw new NotSupportedException();
-	}
-
-	/// <summary>
-	/// Compares the current instance with another PreciseNumber.
-	/// </summary>
-	/// <param name="other">The PreciseNumber to compare with the current instance.</param>
-	/// <returns>A value indicating whether the current instance is less than, equal to, or greater than the other instance.</returns>
-	public int CompareTo(PreciseNumber other)
-	{
-		int greaterOrEqual = this > other ? 1 : 0;
-		return this < other ? -1 : greaterOrEqual;
 	}
 
 	/// <summary>
@@ -575,28 +574,107 @@ public readonly struct PreciseNumber
 	public static PreciseNumber MinMagnitudeNumber(PreciseNumber x, PreciseNumber y) => MinMagnitude(x, y);
 
 	/// <inheritdoc/>
-	public static PreciseNumber Parse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider) => throw new NotSupportedException();
+	public static PreciseNumber Parse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider)
+	{
+		if (s.IsEmpty)
+		{
+			throw new FormatException("Input string was not in a correct format.");
+		}
+
+		if (s.Length == 1 && s[0] == '0')
+		{
+			return Zero;
+		}
+
+		bool isNegative = s[0] == '-';
+		int startIndex = isNegative ? 1 : 0;
+		int exponent = 0;
+		BigInteger significand = 0;
+		bool hasDecimal = false;
+		int decimalDigits = 0;
+
+		for (int i = startIndex; i < s.Length; i++)
+		{
+			char c = s[i];
+			if (c == '.')
+			{
+				if (hasDecimal)
+				{
+					throw new FormatException("Input string was not in a correct format.");
+				}
+
+				hasDecimal = true;
+				continue;
+			}
+
+			if (c is 'e' or 'E')
+			{
+				exponent = int.Parse(s[(i + 1)..], InvariantCulture);
+				break;
+			}
+
+			if (c is < '0' or > '9')
+			{
+				throw new FormatException("Input string was not in a correct format.");
+			}
+
+			if (hasDecimal)
+			{
+				decimalDigits++;
+			}
+
+			significand = (significand * Base10) + (c - '0');
+		}
+
+		exponent -= decimalDigits;
+
+		if (isNegative)
+		{
+			significand = -significand;
+		}
+
+		return new(exponent, significand);
+	}
 
 	/// <inheritdoc/>
-	public static PreciseNumber Parse(string s, NumberStyles style, IFormatProvider? provider) => throw new NotSupportedException();
+	public static PreciseNumber Parse(string s, NumberStyles style, IFormatProvider? provider) =>
+		Parse(s.AsSpan(), style, provider);
 
 	/// <inheritdoc/>
-	public static PreciseNumber Parse(string s, IFormatProvider? provider) => throw new NotSupportedException();
+	public static PreciseNumber Parse(string s, IFormatProvider? provider) =>
+		Parse(s, NumberStyles.Any, provider);
 
 	/// <inheritdoc/>
-	public static PreciseNumber Parse(ReadOnlySpan<char> s, IFormatProvider? provider) => throw new NotSupportedException();
+	public static PreciseNumber Parse(ReadOnlySpan<char> s, IFormatProvider? provider) =>
+		Parse(s, NumberStyles.Any, provider);
 
 	/// <inheritdoc/>
-	public static bool TryParse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, [MaybeNullWhen(false)] out PreciseNumber result) => throw new NotSupportedException();
+	public static bool TryParse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, [MaybeNullWhen(false)] out PreciseNumber result)
+	{
+		try
+		{
+			result = Parse(s, style, provider);
+			return true;
+		}
+		catch (FormatException)
+		{
+			result = default;
+			return false;
+		}
+
+	}
 
 	/// <inheritdoc/>
-	public static bool TryParse([NotNullWhen(true)] string? s, NumberStyles style, IFormatProvider? provider, [MaybeNullWhen(false)] out PreciseNumber result) => throw new NotSupportedException();
+	public static bool TryParse([NotNullWhen(true)] string? s, NumberStyles style, IFormatProvider? provider, [MaybeNullWhen(false)] out PreciseNumber result) =>
+		TryParse(s.AsSpan(), style, provider, out result);
 
 	/// <inheritdoc/>
-	public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out PreciseNumber result) => throw new NotSupportedException();
+	public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out PreciseNumber result) =>
+		TryParse(s.AsSpan(), NumberStyles.Any, provider, out result);
 
 	/// <inheritdoc/>
-	public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, [MaybeNullWhen(false)] out PreciseNumber result) => throw new NotSupportedException();
+	public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, [MaybeNullWhen(false)] out PreciseNumber result) =>
+		TryParse(s, NumberStyles.Any, provider, out result);
 
 	/// <inheritdoc/>
 	public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
@@ -710,7 +788,12 @@ public readonly struct PreciseNumber
 	/// </summary>
 	/// <param name="value">The number to negate.</param>
 	/// <returns>The negated number.</returns>
-	public static PreciseNumber Negate(PreciseNumber value) => -value;
+	public static PreciseNumber Negate(PreciseNumber value)
+	{
+		return value == Zero
+			? value
+			: new(value.Exponent, -value.Significand);
+	}
 
 	/// <summary>
 	/// Subtracts one number from another.
@@ -718,7 +801,14 @@ public readonly struct PreciseNumber
 	/// <param name="left">The number to subtract from.</param>
 	/// <param name="right">The number to subtract.</param>
 	/// <returns>The result of the subtraction.</returns>
-	public static PreciseNumber Subtract(PreciseNumber left, PreciseNumber right) => left - right;
+	public static PreciseNumber Subtract(PreciseNumber left, PreciseNumber right)
+	{
+		var (commonLeft, commonRight, commonExponent) = MakeCommonizedWithExponent(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
+
+		var newSignificand = commonLeft.Significand - commonRight.Significand;
+		return new PreciseNumber(commonExponent, newSignificand);
+	}
 
 	/// <summary>
 	/// Adds two numbers.
@@ -726,7 +816,14 @@ public readonly struct PreciseNumber
 	/// <param name="left">The first number to add.</param>
 	/// <param name="right">The second number to add.</param>
 	/// <returns>The result of the addition.</returns>
-	public static PreciseNumber Add(PreciseNumber left, PreciseNumber right) => left + right;
+	public static PreciseNumber Add(PreciseNumber left, PreciseNumber right)
+	{
+		var (commonLeft, commonRight, commonExponent) = MakeCommonizedWithExponent(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
+
+		var newSignificand = commonLeft.Significand + commonRight.Significand;
+		return new PreciseNumber(commonExponent, newSignificand);
+	}
 
 	/// <summary>
 	/// Multiplies two numbers.
@@ -734,7 +831,27 @@ public readonly struct PreciseNumber
 	/// <param name="left">The first number to multiply.</param>
 	/// <param name="right">The second number to multiply.</param>
 	/// <returns>The result of the multiplication.</returns>
-	public static PreciseNumber Multiply(PreciseNumber left, PreciseNumber right) => left * right;
+	public static PreciseNumber Multiply(PreciseNumber left, PreciseNumber right)
+	{
+		if (left == Zero || right == Zero)
+		{
+			return Zero;
+		}
+		else if (left == One)
+		{
+			return right;
+		}
+		else if (right == One)
+		{
+			return left;
+		}
+
+		var (commonLeft, commonRight, commonExponent) = MakeCommonizedWithExponent(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
+
+		var newSignificand = commonLeft.Significand * commonRight.Significand;
+		return new PreciseNumber(commonExponent + commonExponent, newSignificand);
+	}
 
 	/// <summary>
 	/// Divides one number by another.
@@ -742,30 +859,27 @@ public readonly struct PreciseNumber
 	/// <param name="left">The number to divide.</param>
 	/// <param name="right">The number to divide by.</param>
 	/// <returns>The result of the division.</returns>
-	public static PreciseNumber Divide(PreciseNumber left, PreciseNumber right) => left / right;
+	public static PreciseNumber Divide(PreciseNumber left, PreciseNumber right)
+	{
+		if (right == Zero)
+		{
+			throw new DivideByZeroException();
+		}
 
-	/// <summary>
-	/// Increments a number.
-	/// </summary>
-	/// <param name="value">The number to increment.</param>
-	/// <returns>The incremented number.</returns>
-	/// <exception cref="NotSupportedException">Incrementing is not supported.</exception>
-	public static PreciseNumber Increment(PreciseNumber value) => throw new NotSupportedException();
+		if (left == right)
+		{
+			return One;
+		}
 
-	/// <summary>
-	/// Decrements a number.
-	/// </summary>
-	/// <param name="value">The number to decrement.</param>
-	/// <returns>The decremented number.</returns>
-	/// <exception cref="NotSupportedException">Decrementing is not supported.</exception>
-	public static PreciseNumber Decrement(PreciseNumber value) => throw new NotSupportedException();
+		var (commonLeft, commonRight, commonExponent) = MakeCommonizedWithExponent(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
 
-	/// <summary>
-	/// Returns the unary plus of a number.
-	/// </summary>
-	/// <param name="value">The number.</param>
-	/// <returns>The unary plus of the number.</returns>
-	public static PreciseNumber Plus(PreciseNumber value) => +value;
+		var integerComponent = commonLeft.Significand / commonRight.Significand;
+		double remainder = double.CreateTruncating(commonLeft.Significand - (integerComponent * commonRight.Significand)) * double.Pow(Base10, commonExponent);
+		double fractionalComponent = remainder / (double.CreateTruncating(commonRight.Significand) * double.Pow(Base10, commonExponent));
+
+		return new PreciseNumber(0, integerComponent) + fractionalComponent.ToPreciseNumber();
+	}
 
 	/// <summary>
 	/// Computes the modulus of two numbers.
@@ -773,8 +887,40 @@ public readonly struct PreciseNumber
 	/// <param name="left">The number to divide.</param>
 	/// <param name="right">The number to divide by.</param>
 	/// <returns>The modulus of the two numbers.</returns>
-	/// <exception cref="NotSupportedException">Modulus operation is not supported.</exception>
-	public static PreciseNumber Mod(PreciseNumber left, PreciseNumber right) => throw new NotSupportedException();
+	public static PreciseNumber Mod(PreciseNumber left, PreciseNumber right)
+	{
+		if (right == Zero)
+		{
+			throw new DivideByZeroException();
+		}
+
+		if (left == right)
+		{
+			return Zero;
+		}
+
+		var (commonLeft, commonRight, commonExponent) = MakeCommonizedWithExponent(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
+
+		var integerComponent = commonLeft.Significand / commonRight.Significand;
+		var remainder = commonLeft.Significand - (integerComponent * commonRight.Significand);
+
+		return new PreciseNumber(commonExponent, remainder);
+	}
+
+	public static PreciseNumber Increment(PreciseNumber value) =>
+		value + One;
+
+	public static PreciseNumber Decrement(PreciseNumber value) =>
+		value - One;
+
+	/// <summary>
+	/// Returns the unary plus of a number.
+	/// </summary>
+	/// <param name="value">The number.</param>
+	/// <returns>The unary plus of the number.</returns>
+	public static PreciseNumber UnaryPlus(PreciseNumber value) =>
+		value;
 
 	/// <summary>
 	/// Determines whether one number is greater than another.
@@ -782,7 +928,12 @@ public readonly struct PreciseNumber
 	/// <param name="left">The first number.</param>
 	/// <param name="right">The second number.</param>
 	/// <returns><c>true</c> if the first number is greater than the second; otherwise, <c>false</c>.</returns>
-	public static bool GreaterThan(PreciseNumber left, PreciseNumber right) => left > right;
+	public static bool GreaterThan(PreciseNumber left, PreciseNumber right)
+	{
+		var (commonLeft, commonRight) = MakeCommonized(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
+		return commonLeft.Significand > commonRight.Significand;
+	}
 
 	/// <summary>
 	/// Determines whether one number is greater than or equal to another.
@@ -790,7 +941,12 @@ public readonly struct PreciseNumber
 	/// <param name="left">The first number.</param>
 	/// <param name="right">The second number.</param>
 	/// <returns><c>true</c> if the first number is greater than or equal to the second; otherwise, <c>false</c>.</returns>
-	public static bool GreaterThanOrEqual(PreciseNumber left, PreciseNumber right) => left >= right;
+	public static bool GreaterThanOrEqual(PreciseNumber left, PreciseNumber right)
+	{
+		var (commonLeft, commonRight) = MakeCommonized(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
+		return commonLeft.Significand >= commonRight.Significand;
+	}
 
 	/// <summary>
 	/// Determines whether one number is less than another.
@@ -798,7 +954,12 @@ public readonly struct PreciseNumber
 	/// <param name="left">The first number.</param>
 	/// <param name="right">The second number.</param>
 	/// <returns><c>true</c> if the first number is less than the second; otherwise, <c>false</c>.</returns>
-	public static bool LessThan(PreciseNumber left, PreciseNumber right) => left < right;
+	public static bool LessThan(PreciseNumber left, PreciseNumber right)
+	{
+		var (commonLeft, commonRight) = MakeCommonized(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
+		return commonLeft.Significand < commonRight.Significand;
+	}
 
 	/// <summary>
 	/// Determines whether one number is less than or equal to another.
@@ -806,7 +967,12 @@ public readonly struct PreciseNumber
 	/// <param name="left">The first number.</param>
 	/// <param name="right">The second number.</param>
 	/// <returns><c>true</c> if the first number is less than or equal to the second; otherwise, <c>false</c>.</returns>
-	public static bool LessThanOrEqual(PreciseNumber left, PreciseNumber right) => left <= right;
+	public static bool LessThanOrEqual(PreciseNumber left, PreciseNumber right)
+	{
+		var (commonLeft, commonRight) = MakeCommonized(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
+		return commonLeft.Significand <= commonRight.Significand;
+	}
 
 	/// <summary>
 	/// Determines whether two numbers are equal.
@@ -814,7 +980,12 @@ public readonly struct PreciseNumber
 	/// <param name="left">The first number.</param>
 	/// <param name="right">The second number.</param>
 	/// <returns><c>true</c> if the two numbers are equal; otherwise, <c>false</c>.</returns>
-	public static bool Equal(PreciseNumber left, PreciseNumber right) => left == right;
+	public static bool Equal(PreciseNumber left, PreciseNumber right)
+	{
+		var (commonLeft, commonRight) = MakeCommonized(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
+		return commonLeft.Significand == commonRight.Significand;
+	}
 
 	/// <summary>
 	/// Determines whether two numbers are not equal.
@@ -822,7 +993,12 @@ public readonly struct PreciseNumber
 	/// <param name="left">The first number.</param>
 	/// <param name="right">The second number.</param>
 	/// <returns><c>true</c> if the two numbers are not equal; otherwise, <c>false</c>.</returns>
-	public static bool NotEqual(PreciseNumber left, PreciseNumber right) => left != right;
+	public static bool NotEqual(PreciseNumber left, PreciseNumber right)
+	{
+		var (commonLeft, commonRight) = MakeCommonized(left, right);
+		AssertExponentsMatch(commonLeft, commonRight);
+		return commonLeft.Significand != commonRight.Significand;
+	}
 
 	/// <summary>
 	/// Returns the larger of two numbers.
@@ -856,151 +1032,6 @@ public readonly struct PreciseNumber
 	/// <param name="decimalDigits">The number of decimal digits to round to.</param>
 	/// <returns>The rounded number.</returns>
 	public static PreciseNumber Round(PreciseNumber value, int decimalDigits) => value.Round(decimalDigits);
-
-	/// <inheritdoc/>
-	public static PreciseNumber operator -(PreciseNumber value)
-	{
-		return value == Zero
-			? value
-			: new(value.Exponent, -value.Significand);
-	}
-
-	/// <inheritdoc/>
-	public static PreciseNumber operator -(PreciseNumber left, PreciseNumber right) =>
-		PreciseSubtract(left, right);
-
-	/// <inheritdoc/>
-	public static bool operator !=(PreciseNumber left, PreciseNumber right) => !(left == right);
-
-	/// <inheritdoc/>
-	public static PreciseNumber operator *(PreciseNumber left, PreciseNumber right)
-	{
-		if (left == Zero || right == Zero)
-		{
-			return Zero;
-		}
-		else if (left == One)
-		{
-			return right;
-		}
-		else if (right == One)
-		{
-			return left;
-		}
-
-		return PreciseMultiply(left, right);
-	}
-
-	/// <inheritdoc/>
-	public static PreciseNumber operator /(PreciseNumber left, PreciseNumber right)
-	{
-		if (right == Zero)
-		{
-			throw new DivideByZeroException();
-		}
-		else if (left == right)
-		{
-			return One;
-		}
-
-		return PreciseDivide(left, right);
-	}
-
-	/// <inheritdoc/>
-	public static PreciseNumber operator +(PreciseNumber value) => value;
-
-	/// <inheritdoc/>
-	public static PreciseNumber operator +(PreciseNumber left, PreciseNumber right) =>
-		PreciseAdd(left, right);
-
-	/// <inheritdoc/>
-	public static bool operator ==(PreciseNumber left, PreciseNumber right)
-	{
-		MakeCommonized(ref left, ref right);
-		AssertExponentsMatch(left, right);
-		return left.Significand == right.Significand;
-	}
-
-	/// <inheritdoc/>
-	public static bool operator >(PreciseNumber left, PreciseNumber right)
-	{
-		MakeCommonized(ref left, ref right);
-		AssertExponentsMatch(left, right);
-		return left.Significand > right.Significand;
-	}
-
-	/// <inheritdoc/>
-	public static bool operator <(PreciseNumber left, PreciseNumber right)
-	{
-		MakeCommonized(ref left, ref right);
-		AssertExponentsMatch(left, right);
-		return left.Significand < right.Significand;
-	}
-
-	/// <inheritdoc/>
-	public static bool operator >=(PreciseNumber left, PreciseNumber right)
-	{
-		MakeCommonized(ref left, ref right);
-		AssertExponentsMatch(left, right);
-		return left.Significand >= right.Significand;
-	}
-
-	/// <inheritdoc/>
-	public static bool operator <=(PreciseNumber left, PreciseNumber right)
-	{
-		MakeCommonized(ref left, ref right);
-		AssertExponentsMatch(left, right);
-		return left.Significand <= right.Significand;
-	}
-
-	/// <inheritdoc/>
-	public static PreciseNumber operator %(PreciseNumber left, PreciseNumber right) => throw new NotSupportedException();
-
-	/// <inheritdoc/>
-	public static PreciseNumber operator --(PreciseNumber value) => throw new NotSupportedException();
-
-	/// <inheritdoc/>
-	public static PreciseNumber operator ++(PreciseNumber value) => throw new NotSupportedException();
-
-	/// <summary>
-	/// Asserts that a type implements a specified generic interface.
-	/// </summary>
-	/// <param name="type">The type to check.</param>
-	/// <param name="genericInterface">The generic interface to check for.</param>
-	/// <exception cref="ArgumentException">Thrown when the specified type does not implement the generic interface.</exception>
-	internal static void AssertDoesImplementGenericInterface(Type type, Type genericInterface) =>
-		Debug.Assert(DoesImplementGenericInterface(type, genericInterface), $"{type.Name} does not implement {genericInterface.Name}");
-
-	/// <summary>
-	/// Determines whether a type implements a specified generic interface.
-	/// </summary>
-	/// <param name="type">The type to check.</param>
-	/// <param name="genericInterface">The generic interface to check for.</param>
-	/// <returns><c>true</c> if the type implements the generic interface; otherwise, <c>false</c>.</returns>
-	/// <exception cref="ArgumentException">Thrown when the specified type is not a valid generic interface.</exception>
-	internal static bool DoesImplementGenericInterface(Type type, Type genericInterface)
-	{
-		bool genericInterfaceIsValid = genericInterface.IsInterface && genericInterface.IsGenericType;
-
-		return genericInterfaceIsValid
-			? Array.Exists(type.GetInterfaces(), x => x.IsGenericType && x.GetGenericTypeDefinition() == genericInterface)
-			: throw new ArgumentException($"{genericInterface.Name} is not a generic interface");
-	}
-
-	/// <summary>
-	/// Converts the current number to the specified numeric type.
-	/// </summary>
-	/// <typeparam name="TOutput">The type to convert to. Must implement <see cref="INumber{TOutput}"/>.</typeparam>
-	/// <returns>The converted value of the number as type <typeparamref name="TOutput"/>.</returns>
-	/// <exception cref="OverflowException">
-	/// Thrown if the conversion cannot be performed. This may occur if the target type cannot represent
-	/// the value of the number.
-	/// </exception>
-	public TOutput To<TOutput>()
-		where TOutput : INumber<TOutput> =>
-		typeof(TOutput) == typeof(PreciseNumber)
-		? (TOutput)(object)this
-		: TOutput.CreateChecked(Significand) * TOutput.CreateChecked(Math.Pow(Base10, Exponent));
 
 	/// <summary>
 	/// Returns the square of the current number.
@@ -1070,90 +1101,95 @@ public readonly struct PreciseNumber
 		return Math.Exp(power.To<double>()).ToPreciseNumber();
 	}
 
-	/// <summary>
-	/// Adds two numbers without considering their significant digits.
-	/// </summary>
-	/// <param name="left">The left operand.</param>
-	/// <param name="right">The right operand.</param>
-	/// <returns>A new <see cref="PreciseNumber"/> representing the sum of the two operands.</returns>
-	public static PreciseNumber PreciseAdd(PreciseNumber left, PreciseNumber right)
-	{
-		int commonExponent = MakeCommonizedAndGetExponent(ref left, ref right);
-		AssertExponentsMatch(left, right);
+	/// <inheritdoc/>
+	public static PreciseNumber operator -(PreciseNumber value) =>
+		Negate(value);
 
-		var newSignificand = left.Significand + right.Significand;
-		return new PreciseNumber(commonExponent, newSignificand);
+	/// <inheritdoc/>
+	public static PreciseNumber operator -(PreciseNumber left, PreciseNumber right) =>
+		Subtract(left, right);
+
+	/// <inheritdoc/>
+	public static PreciseNumber operator *(PreciseNumber left, PreciseNumber right) =>
+		Multiply(left, right);
+
+	/// <inheritdoc/>
+	public static PreciseNumber operator /(PreciseNumber left, PreciseNumber right) =>
+		Divide(left, right);
+
+	/// <inheritdoc/>
+	public static PreciseNumber operator +(PreciseNumber value) =>
+		UnaryPlus(value);
+
+	/// <inheritdoc/>
+	public static PreciseNumber operator +(PreciseNumber left, PreciseNumber right) =>
+		Add(left, right);
+
+	/// <inheritdoc/>
+	public static bool operator >(PreciseNumber left, PreciseNumber right) =>
+		GreaterThan(left, right);
+
+	/// <inheritdoc/>
+	public static bool operator <(PreciseNumber left, PreciseNumber right) =>
+		LessThan(left, right);
+
+	/// <inheritdoc/>
+	public static bool operator >=(PreciseNumber left, PreciseNumber right) =>
+		GreaterThanOrEqual(left, right);
+
+	/// <inheritdoc/>
+	public static bool operator <=(PreciseNumber left, PreciseNumber right) =>
+		LessThanOrEqual(left, right);
+
+	/// <inheritdoc/>
+	public static PreciseNumber operator %(PreciseNumber left, PreciseNumber right) =>
+		Mod(left, right);
+
+	/// <inheritdoc/>
+	public static PreciseNumber operator --(PreciseNumber value) =>
+		Decrement(value);
+
+	/// <inheritdoc/>
+	public static PreciseNumber operator ++(PreciseNumber value) =>
+		Increment(value);
+
+	/// <summary>
+	/// Asserts that a type implements a specified generic interface.
+	/// </summary>
+	/// <param name="type">The type to check.</param>
+	/// <param name="genericInterface">The generic interface to check for.</param>
+	/// <exception cref="ArgumentException">Thrown when the specified type does not implement the generic interface.</exception>
+	internal static void AssertDoesImplementGenericInterface(Type type, Type genericInterface) =>
+		Debug.Assert(DoesImplementGenericInterface(type, genericInterface), $"{type.Name} does not implement {genericInterface.Name}");
+
+	/// <summary>
+	/// Determines whether a type implements a specified generic interface.
+	/// </summary>
+	/// <param name="type">The type to check.</param>
+	/// <param name="genericInterface">The generic interface to check for.</param>
+	/// <returns><c>true</c> if the type implements the generic interface; otherwise, <c>false</c>.</returns>
+	/// <exception cref="ArgumentException">Thrown when the specified type is not a valid generic interface.</exception>
+	internal static bool DoesImplementGenericInterface(Type type, Type genericInterface)
+	{
+		bool genericInterfaceIsValid = genericInterface.IsInterface && genericInterface.IsGenericType;
+
+		return genericInterfaceIsValid
+			? Array.Exists(type.GetInterfaces(), x => x.IsGenericType && x.GetGenericTypeDefinition() == genericInterface)
+			: throw new ArgumentException($"{genericInterface.Name} is not a generic interface");
 	}
 
 	/// <summary>
-	/// Subtracts the right number from the left without considering their significant digits.
+	/// Converts the current number to the specified numeric type.
 	/// </summary>
-	/// <param name="left">The left operand.</param>
-	/// <param name="right">The right operand.</param>
-	/// <returns>A new <see cref="PreciseNumber"/> representing the difference between the two operands.</returns>
-	public static PreciseNumber PreciseSubtract(PreciseNumber left, PreciseNumber right)
-	{
-		int commonExponent = MakeCommonizedAndGetExponent(ref left, ref right);
-		AssertExponentsMatch(left, left);
-
-		var newSignificand = left.Significand - right.Significand;
-		return new PreciseNumber(commonExponent, newSignificand);
-	}
-
-	/// <summary>
-	/// Multiplies two numbers without considering their significant digits.
-	/// </summary>
-	/// <param name="left">The left operand.</param>
-	/// <param name="right">The right operand.</param>
-	/// <returns>A new <see cref="PreciseNumber"/> representing the product of the two operands.</returns>
-	public static PreciseNumber PreciseMultiply(PreciseNumber left, PreciseNumber right)
-	{
-		if (left == Zero || right == Zero)
-		{
-			return Zero;
-		}
-		else if (left == One)
-		{
-			return right;
-		}
-		else if (right == One)
-		{
-			return left;
-		}
-
-		int commonExponent = MakeCommonizedAndGetExponent(ref left, ref right);
-		AssertExponentsMatch(left, right);
-
-		var newSignificand = left.Significand * right.Significand;
-		return new PreciseNumber(commonExponent + commonExponent, newSignificand);
-	}
-
-	/// <summary>
-	/// Divides the left number by the right without considering their significant digits.
-	/// </summary>
-	/// <param name="left">The left operand.</param>
-	/// <param name="right">The right operand.</param>
-	/// <returns>A new <see cref="PreciseNumber"/> representing the quotient of the two operands.</returns>
-	/// <exception cref="DivideByZeroException">Thrown when the right operand is zero.</exception>
-	public static PreciseNumber PreciseDivide(PreciseNumber left, PreciseNumber right)
-	{
-		if (right == Zero)
-		{
-			throw new DivideByZeroException();
-		}
-
-		if (left == right)
-		{
-			return One;
-		}
-
-		int commonExponent = MakeCommonizedAndGetExponent(ref left, ref right);
-		AssertExponentsMatch(left, right);
-
-		var integerComponent = left.Significand / right.Significand;
-		double remainder = double.CreateTruncating(left.Significand % right.Significand) * double.Pow(Base10, commonExponent);
-		double fractionalComponent = remainder / (double.CreateTruncating(right.Significand) * double.Pow(Base10, commonExponent));
-
-		return new PreciseNumber(0, integerComponent) + fractionalComponent.ToPreciseNumber();
-	}
+	/// <typeparam name="TOutput">The type to convert to. Must implement <see cref="INumber{TOutput}"/>.</typeparam>
+	/// <returns>The converted value of the number as type <typeparamref name="TOutput"/>.</returns>
+	/// <exception cref="OverflowException">
+	/// Thrown if the conversion cannot be performed. This may occur if the target type cannot represent
+	/// the value of the number.
+	/// </exception>
+	public TOutput To<TOutput>()
+		where TOutput : INumber<TOutput> =>
+		typeof(TOutput) == typeof(PreciseNumber)
+		? (TOutput)(object)this
+		: TOutput.CreateChecked(Significand) * TOutput.CreateChecked(Math.Pow(Base10, Exponent));
 }

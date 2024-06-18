@@ -27,7 +27,7 @@ public static class PreciseNumberExtensions
 		}
 		else
 		{
-			success = TryCreate((TInput)input, out preciseNumber);
+			success = TryCreate((TInput)input, out preciseNumber!);
 		}
 
 		return success
