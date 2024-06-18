@@ -426,7 +426,7 @@ public record PreciseNumber
 	/// </summary>
 	/// <param name="significantDigits">The number of significant digits to reduce to.</param>
 	/// <returns>A new instance of <see cref="PreciseNumber"/> reduced to the specified number of significant digits.</returns>
-	protected internal PreciseNumber ReduceSignificance(int significantDigits)
+	public PreciseNumber ReduceSignificance(int significantDigits)
 	{
 		int significantDifference = significantDigits < SignificantDigits
 			? SignificantDigits - significantDigits
