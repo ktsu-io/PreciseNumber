@@ -25,7 +25,7 @@ public record PreciseNumber
 	/// <param name="exponent">The exponent of the number.</param>
 	/// <param name="significand">The significand of the number.</param>
 	/// <param name="sanitize">If true, trailing zeros in the significand will be removed.</param>
-	internal PreciseNumber(int exponent, BigInteger significand, bool sanitize = true)
+	protected PreciseNumber(int exponent, BigInteger significand, bool sanitize = true)
 	{
 		if (sanitize)
 		{
@@ -94,19 +94,19 @@ public record PreciseNumber
 	/// <summary>
 	/// Gets the exponent of the number.
 	/// </summary>
-	internal int Exponent { get; }
+	protected int Exponent { get; }
 
 	/// <summary>
 	/// Gets the significand of the number.
 	/// </summary>
-	internal BigInteger Significand { get; }
+	protected BigInteger Significand { get; }
 
 	/// <summary>
 	/// Gets the number of significant digits in the number.
 	/// </summary>
-	internal int SignificantDigits { get; }
+	protected int SignificantDigits { get; }
 
-	private static CultureInfo InvariantCulture { get; } = CultureInfo.InvariantCulture;
+	protected static CultureInfo InvariantCulture { get; } = CultureInfo.InvariantCulture;
 
 	private const int BinaryRadix = 2;
 
@@ -342,7 +342,7 @@ public record PreciseNumber
 	/// <param name="digit">The digit to repeat.</param>
 	/// <param name="numberOfRepeats">The number of times to repeat the digit.</param>
 	/// <returns>A <see cref="BigInteger"/> representing the repeating digit sequence.</returns>
-	internal static BigInteger CreateRepeatingDigits(int digit, int numberOfRepeats)
+	protected static BigInteger CreateRepeatingDigits(int digit, int numberOfRepeats)
 	{
 		if (numberOfRepeats <= 0)
 		{
@@ -361,7 +361,7 @@ public record PreciseNumber
 	/// <summary>
 	/// Gets a value indicating whether the current instance has infinite precision.
 	/// </summary>
-	internal bool HasInfinitePrecision =>
+	protected bool HasInfinitePrecision =>
 		Exponent == 0
 		&& (Significand == BigInteger.One || Significand == BigInteger.Zero || Significand == BigInteger.MinusOne);
 
@@ -371,7 +371,7 @@ public record PreciseNumber
 	/// <param name="left">The first number.</param>
 	/// <param name="right">The second number.</param>
 	/// <returns>The lower of the decimal digit counts of the two numbers.</returns>
-	internal static int LowestDecimalDigits(PreciseNumber left, PreciseNumber right)
+	protected static int LowestDecimalDigits(PreciseNumber left, PreciseNumber right)
 	{
 		int leftDecimalDigits = left.CountDecimalDigits();
 		int rightDecimalDigits = right.CountDecimalDigits();
@@ -390,7 +390,7 @@ public record PreciseNumber
 	/// <param name="left">The first number.</param>
 	/// <param name="right">The second number.</param>
 	/// <returns>The lower of the significant digit counts of the two numbers.</returns>
-	internal static int LowestSignificantDigits(PreciseNumber left, PreciseNumber right)
+	protected static int LowestSignificantDigits(PreciseNumber left, PreciseNumber right)
 	{
 		int leftSignificantDigits = left.SignificantDigits;
 		int rightSignificantDigits = right.SignificantDigits;
@@ -407,7 +407,7 @@ public record PreciseNumber
 	/// Counts the number of decimal digits in the current instance.
 	/// </summary>
 	/// <returns>The number of decimal digits in the current instance.</returns>
-	internal int CountDecimalDigits() =>
+	protected int CountDecimalDigits() =>
 		Exponent > 0
 		? 0
 		: int.Abs(Exponent);
@@ -417,7 +417,7 @@ public record PreciseNumber
 	/// </summary>
 	/// <param name="significantDigits">The number of significant digits to reduce to.</param>
 	/// <returns>A new instance of <see cref="PreciseNumber"/> reduced to the specified number of significant digits.</returns>
-	internal PreciseNumber ReduceSignificance(int significantDigits)
+	protected PreciseNumber ReduceSignificance(int significantDigits)
 	{
 		int significantDifference = significantDigits < SignificantDigits
 			? SignificantDigits - significantDigits
@@ -442,7 +442,7 @@ public record PreciseNumber
 	/// <param name="left">The left <see cref="PreciseNumber"/> instance.</param>
 	/// <param name="right">The right <see cref="PreciseNumber"/> instance.</param>
 	/// <returns>A tuple containing the commonized <see cref="PreciseNumber"/> instances.</returns>
-	internal static (PreciseNumber, PreciseNumber) MakeCommonized(PreciseNumber left, PreciseNumber right)
+	protected static (PreciseNumber, PreciseNumber) MakeCommonized(PreciseNumber left, PreciseNumber right)
 	{
 		var (commonLeft, commonRight, _) = MakeCommonizedWithExponent(left, right);
 		return (commonLeft, commonRight);
@@ -456,7 +456,7 @@ public record PreciseNumber
 	/// <returns>
 	/// A tuple containing the commonized <see cref="PreciseNumber"/> instances and the common exponent.
 	/// </returns>
-	internal static (PreciseNumber, PreciseNumber, int) MakeCommonizedWithExponent(PreciseNumber left, PreciseNumber right)
+	protected static (PreciseNumber, PreciseNumber, int) MakeCommonizedWithExponent(PreciseNumber left, PreciseNumber right)
 	{
 		int smallestExponent = left.Exponent < right.Exponent ? left.Exponent : right.Exponent;
 		int exponentDifferenceLeft = Math.Abs(left.Exponent - smallestExponent);
@@ -780,7 +780,7 @@ public record PreciseNumber
 	/// </summary>
 	/// <param name="left">The first number.</param>
 	/// <param name="right">The second number.</param>
-	internal static void AssertExponentsMatch(PreciseNumber left, PreciseNumber right) =>
+	protected static void AssertExponentsMatch(PreciseNumber left, PreciseNumber right) =>
 		Debug.Assert(left.Exponent == right.Exponent, $"{nameof(AssertExponentsMatch)}: {left.Exponent} == {right.Exponent}");
 
 	/// <summary>
