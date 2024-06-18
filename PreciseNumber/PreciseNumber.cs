@@ -24,8 +24,17 @@ public record PreciseNumber
 	/// </summary>
 	/// <param name="exponent">The exponent of the number.</param>
 	/// <param name="significand">The significand of the number.</param>
+	protected internal PreciseNumber(int exponent, BigInteger significand)
+		: this(exponent, significand, true)
+	{ }
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="PreciseNumber"/> record.
+	/// </summary>
+	/// <param name="exponent">The exponent of the number.</param>
+	/// <param name="significand">The significand of the number.</param>
 	/// <param name="sanitize">If true, trailing zeros in the significand will be removed.</param>
-	protected internal PreciseNumber(int exponent, BigInteger significand, bool sanitize = true)
+	protected internal PreciseNumber(int exponent, BigInteger significand, bool sanitize)
 	{
 		if (sanitize)
 		{
