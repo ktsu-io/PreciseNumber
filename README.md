@@ -1,1 +1,1 @@
-# ktsu.io.PreciseNumber
+# ktsu.PreciseNumber

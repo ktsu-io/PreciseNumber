@@ -1,6 +1,6 @@
 // Ignore Spelling: Commonized
 
-namespace ktsu.io.PreciseNumber.Tests;
+namespace ktsu.PreciseNumber.Tests;
 
 using System.Globalization;
 using System.Numerics;

@@ -1,4 +1,4 @@
-namespace ktsu.io.PreciseNumber;
+namespace ktsu.PreciseNumber;
 
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
